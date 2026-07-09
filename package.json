@@ -1,0 +1,75 @@
+{
+  "name": "maiboli",
+  "displayName": "Maiboli (VoiceBridge — Speak to Code)",
+  "description": "Speak in your mother tongue — Hindi, Marathi, Spanish, and 55+ more languages — and get English text at your cursor. Works in code files, terminals, and AI chat boxes.",
+  "version": "0.1.0",
+  "publisher": "verve",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dev14101989/maiboli.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "keywords": [
+    "voice",
+    "dictation",
+    "speech-to-text",
+    "hindi",
+    "marathi",
+    "translation",
+    "whisper",
+    "sarvam"
+  ],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "maiboli.startDictation",
+        "title": "Maiboli: Start / Stop Dictation"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "maiboli.startDictation",
+        "key": "ctrl+alt+v",
+        "mac": "cmd+alt+v"
+      }
+    ],
+    "configuration": {
+      "title": "Maiboli",
+      "properties": {
+        "maiboli.provider": {
+          "type": "string",
+          "enum": ["whisper", "sarvam"],
+          "default": "whisper",
+          "description": "Which speech engine to use. 'whisper' = OpenAI (any of 55+ languages -> English). 'sarvam' = Sarvam AI (best for Indian languages and Hinglish)."
+        },
+        "maiboli.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your OpenAI API key (used when provider = whisper)."
+        },
+        "maiboli.sarvamApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your Sarvam API key (used when provider = sarvam)."
+        },
+        "maiboli.recorder": {
+          "type": "string",
+          "enum": ["sox", "ffmpeg"],
+          "default": "sox",
+          "description": "Which tool records your mic. 'sox' is simplest and works on Mac + Windows. 'ffmpeg' is Mac-only."
+        },
+        "maiboli.recorderPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional: full path to sox/ffmpeg if VS Code can't find it (e.g. /opt/homebrew/bin/sox or C:\\Program Files (x86)\\sox-14-4-2\\sox.exe)."
+        }
+      }
+    }
+  }
+}
