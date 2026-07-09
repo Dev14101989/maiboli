@@ -4,6 +4,11 @@
   "description": "Speak in your mother tongue — Hindi, Marathi, Spanish, and 55+ more languages — and get English text at your cursor. Works in code files, terminals, and AI chat boxes.",
   "version": "0.1.0",
   "publisher": "verve",
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#0c5a6e",
+    "theme": "dark"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
