@@ -183,11 +183,19 @@ async function transcribeFile() {
 }
 
 // Retry transient failures (rate limits, overloaded servers) with a short
-// backoff before giving up — a 503 usually clears within seconds.
+// backoff before giving up — a 503 usually clears within seconds. Each
+// attempt is capped at 60s so a hung connection can't spin forever.
 async function fetchWithRetry(url, options, tries = 3) {
   let res;
   for (let i = 0; i < tries; i++) {
-    res = await fetch(url, options);
+    try {
+      res = await fetch(url, { ...options, signal: AbortSignal.timeout(60000) });
+    } catch (e) {
+      if (e.name === "TimeoutError" || e.name === "AbortError") {
+        throw new Error("request timed out after 60s — check your internet connection and try again.");
+      }
+      throw e;
+    }
     if (res.ok || ![429, 500, 502, 503, 504].includes(res.status)) return res;
     if (i < tries - 1) {
       await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
