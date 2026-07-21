@@ -61,10 +61,25 @@ Transcribe() {
             TrayTip("Maiboli", "Paste your SARVAM_API_KEY at the top of maiboli.ahk", 2)
             return ""
         }
-        cmd := Format('curl -s --max-time 60 https://api.sarvam.ai/speech-to-text-translate '
-            . '-H "api-subscription-key: {}" -F model=saaras:v2.5 '
-            . '-F "file=@{};type=audio/wav" -o "{}"', SARVAM_API_KEY, wavFile, respFile)
-        field := "transcript"
+        ; Sarvam rejects clips over 30s — split into 29s chunks and join the text.
+        chunkBase := A_Temp . "\maiboli-chunk"
+        Loop Files chunkBase . "*.wav"
+            try FileDelete(A_LoopFileFullPath)
+        RunWait(Format('"{}" "{}" "{}_%03n.wav" trim 0 29 : newfile : restart',
+            SOX_PATH, wavFile, chunkBase), , "Hide")
+        text := ""
+        Loop Files chunkBase . "*.wav" {
+            cmd := Format('curl -s --max-time 60 https://api.sarvam.ai/speech-to-text-translate '
+                . '-H "api-subscription-key: {}" -F model=saaras:v2.5 '
+                . '-F "file=@{};type=audio/wav" -o "{}"', SARVAM_API_KEY, A_LoopFileFullPath, respFile)
+            RunWait(A_ComSpec . ' /c ' . cmd, , "Hide")
+            part := ReadJsonField(respFile, "transcript")
+            if (part != "")
+                text .= (text != "" ? " " : "") . part
+            try FileDelete(A_LoopFileFullPath)
+        }
+        try FileDelete(wavFile)
+        return text
     } else {
         if (OPENAI_API_KEY = "") {
             TrayTip("Maiboli", "Paste your OPENAI_API_KEY at the top of maiboli.ahk", 2)
@@ -73,14 +88,16 @@ Transcribe() {
         cmd := Format('curl -s --max-time 60 https://api.openai.com/v1/audio/translations '
             . '-H "Authorization: Bearer {}" -F model=whisper-1 '
             . '-F "file=@{}" -o "{}"', OPENAI_API_KEY, wavFile, respFile)
-        field := "text"
     }
     RunWait(A_ComSpec . ' /c ' . cmd, , "Hide")
     try FileDelete(wavFile)
+    return ReadJsonField(respFile, "text")
+}
 
+; Parse one field out of a JSON response file with PowerShell (no AHK JSON lib).
+ReadJsonField(respFile, field) {
     if (!FileExist(respFile))
         return ""
-    ; Parse the JSON with PowerShell (no AHK JSON lib needed).
     psOut := A_Temp . "\maiboli-text.txt"
     ps := Format('powershell -NoProfile -Command "(Get-Content -Raw \"{}\" | ConvertFrom-Json).{} | Set-Content -NoNewline \"{}\""',
         respFile, field, psOut)

@@ -139,7 +139,7 @@ async function transcribeFile() {
         title: `Maiboli: transcribing (${provider})…`,
       },
       () =>
-        provider === "sarvam" ? sarvam(buffer, cfg) : whisper(buffer, cfg)
+        provider === "sarvam" ? sarvamLong(buffer, cfg) : whisper(buffer, cfg)
     );
 
     if (text) insertText(text);
@@ -168,6 +168,17 @@ async function whisper(buffer, cfg) {
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`);
   const json = await res.json();
   return (json.text || "").trim();
+}
+
+// Sarvam's instant endpoint rejects audio over 30s — split long recordings
+// into 29s chunks, transcribe each in order, and join the English output.
+async function sarvamLong(buffer, cfg) {
+  const parts = wavChunks(buffer, 29);
+  const out = [];
+  for (const part of parts) {
+    out.push(await sarvam(part, cfg));
+  }
+  return out.filter(Boolean).join(" ").trim();
 }
 
 // Sarvam speech-to-text-translate -> English (best for Indian languages/Hinglish)
@@ -265,6 +276,85 @@ function fixWavHeader(buffer) {
     off += 8 + size + (size % 2);
   }
   return buffer;
+}
+
+// Locate the PCM "data" chunk inside a WAV buffer.
+function findDataChunk(buffer) {
+  if (buffer.length < 44 || buffer.toString("ascii", 0, 4) !== "RIFF") {
+    return null;
+  }
+  let off = 12;
+  while (off + 8 <= buffer.length) {
+    const id = buffer.toString("ascii", off, off + 4);
+    const size = buffer.readUInt32LE(off + 4);
+    if (id === "data") {
+      return { offset: off + 8, size: Math.min(size, buffer.length - off - 8) };
+    }
+    if (size === 0 || size === 0xffffffff) return null;
+    off += 8 + size + (size % 2);
+  }
+  return null;
+}
+
+// Split a 16kHz/mono/16-bit WAV into standalone WAVs of at most maxSec each.
+// Cuts are placed at the quietest moment near each boundary (usually a pause
+// between sentences), so chunks stay meaningful on their own.
+function wavChunks(buffer, maxSec) {
+  const data = findDataChunk(buffer);
+  const bytesPerSec = 16000 * 2;
+  const maxBytes = maxSec * bytesPerSec;
+  if (!data || data.size <= maxBytes) return [buffer];
+
+  const chunks = [];
+  let pos = 0;
+  while (data.size - pos > maxBytes) {
+    const cut = quietestCut(buffer, data.offset + pos, maxBytes, bytesPerSec);
+    chunks.push(
+      makeWav(buffer.subarray(data.offset + pos, data.offset + pos + cut))
+    );
+    pos += cut;
+  }
+  chunks.push(makeWav(buffer.subarray(data.offset + pos, data.offset + data.size)));
+  return chunks;
+}
+
+// Scan 100ms frames in the last 40% of the allowed chunk length and return
+// a sample-aligned cut point at the quietest one.
+function quietestCut(buffer, start, maxBytes, bytesPerSec) {
+  const frame = Math.floor(bytesPerSec / 10 / 2) * 2;
+  const from = Math.floor((maxBytes * 0.6) / 2) * 2;
+  let best = maxBytes;
+  let bestEnergy = Infinity;
+  for (let p = from; p + frame <= maxBytes; p += frame) {
+    let energy = 0;
+    for (let i = 0; i < frame; i += 2) {
+      energy += Math.abs(buffer.readInt16LE(start + p + i));
+    }
+    if (energy < bestEnergy) {
+      bestEnergy = energy;
+      best = p + frame / 2;
+    }
+  }
+  return Math.floor(best / 2) * 2;
+}
+
+// Wrap raw 16kHz/mono/16-bit PCM in a canonical 44-byte WAV header.
+function makeWav(pcm) {
+  const h = Buffer.alloc(44);
+  h.write("RIFF", 0);
+  h.writeUInt32LE(36 + pcm.length, 4);
+  h.write("WAVE", 8);
+  h.write("fmt ", 12);
+  h.writeUInt32LE(16, 16);
+  h.writeUInt16LE(1, 20);
+  h.writeUInt16LE(1, 22);
+  h.writeUInt32LE(16000, 24);
+  h.writeUInt32LE(32000, 28);
+  h.writeUInt16LE(2, 32);
+  h.writeUInt16LE(16, 34);
+  h.write("data", 36);
+  h.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([h, pcm]);
 }
 
 function deactivate() {

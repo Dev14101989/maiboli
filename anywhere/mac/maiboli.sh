@@ -67,13 +67,22 @@ if [ -f "$PIDFILE" ]; then
 
   if [ "${PROVIDER:-whisper}" = "sarvam" ]; then
     if [ -z "${SARVAM_API_KEY:-}" ]; then notify "Add SARVAM_API_KEY in ~/.config/maiboli/config"; exit 1; fi
-    RESP="$(curl -s --max-time 60 https://api.sarvam.ai/speech-to-text-translate \
-      -H "api-subscription-key: $SARVAM_API_KEY" \
-      -F model="saaras:v2.5" \
-      -F "file=@$WAV;type=audio/wav")"
-    TEXT="$(printf '%s' "$RESP" | /usr/bin/python3 -c 'import sys,json
+    # Sarvam rejects clips over 30s — split into 29s chunks and join the text.
+    CHUNK_DIR="$(mktemp -d)"
+    "$SOX" "$WAV" "$CHUNK_DIR/c_%03n.wav" trim 0 29 : newfile : restart
+    TEXT=""
+    for f in "$CHUNK_DIR"/c_*.wav; do
+      [ -s "$f" ] || continue
+      RESP="$(curl -s --max-time 60 https://api.sarvam.ai/speech-to-text-translate \
+        -H "api-subscription-key: $SARVAM_API_KEY" \
+        -F model="saaras:v2.5" \
+        -F "file=@$f;type=audio/wav")"
+      PART="$(printf '%s' "$RESP" | /usr/bin/python3 -c 'import sys,json
 try: d=json.load(sys.stdin); print((d.get("transcript") or d.get("text") or "").strip())
 except Exception: pass')"
+      [ -n "$PART" ] && TEXT="${TEXT:+$TEXT }$PART"
+    done
+    rm -rf "$CHUNK_DIR"
   else
     if [ -z "${OPENAI_API_KEY:-}" ]; then notify "Add OPENAI_API_KEY in ~/.config/maiboli/config"; exit 1; fi
     RESP="$(curl -s --max-time 60 https://api.openai.com/v1/audio/translations \

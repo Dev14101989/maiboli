@@ -2,7 +2,7 @@
   "name": "maiboli",
   "displayName": "Maiboli (VoiceBridge — Speak to Code)",
   "description": "Speak in your mother tongue — Hindi, Marathi, Spanish, and 55+ more languages — and get English text at your cursor. Works in code files, terminals, and AI chat boxes.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "verve",
   "icon": "icon.png",
   "galleryBanner": {
