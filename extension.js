@@ -289,7 +289,7 @@ async function rewrite(text, cfg) {
 
   const pref = cfg.get("rewriteProvider", "auto");
   const openaiKey = cfg.get("openaiApiKey");
-  if (pref !== "sarvam" && openaiKey) {
+  if ((pref === "auto" || pref === "openai") && openaiKey) {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -312,7 +312,7 @@ async function rewrite(text, cfg) {
   }
 
   const sarvamKey = cfg.get("sarvamApiKey");
-  if (pref !== "openai" && sarvamKey) {
+  if ((pref === "auto" || pref === "sarvam") && sarvamKey) {
     const res = await fetch("https://api.sarvam.ai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -332,6 +332,27 @@ async function rewrite(text, cfg) {
     if (!res.ok) throw new Error(`Sarvam ${res.status}`);
     const json = await res.json();
     const out = (json.choices?.[0]?.message?.content || "").trim();
+    return out || text;
+  }
+
+  const geminiKey = cfg.get("geminiApiKey");
+  if ((pref === "auto" || pref === "gemini") && geminiKey) {
+    const model = cfg.get("geminiModel", "gemini-2.5-flash");
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: { "x-goog-api-key": geminiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: system }] },
+          contents: [{ parts: [{ text: text }] }],
+        }),
+      }
+    );
+    if (!res.ok) throw new Error(`Gemini ${res.status}`);
+    const json = await res.json();
+    const parts = json.candidates?.[0]?.content?.parts || [];
+    const out = parts.map((p) => p.text || "").join("").trim();
     return out || text;
   }
 

@@ -46,8 +46,9 @@ AI coding assistants speak English. Millions of great developers think in someth
 Dictated text can come out slightly rough — fillers, grammar slips, broken sentence joins. Turn on **AI rewrite** and Maiboli passes the English through a small LLM that polishes it while keeping your meaning and technical terms:
 
 - Toggle it from the Command Palette: **Maiboli: Toggle AI Rewrite** (or Settings → *Maiboli: Rewrite*).
-- It reuses the API key you already have: OpenAI key → `gpt-4o-mini`, Sarvam key → `sarvam-m`. Cost is a tiny fraction of the transcription itself.
-- **Mix and match:** transcribe with Sarvam, polish with GPT — just set both keys. *Maiboli: Rewrite Provider* forces a specific polisher (`auto` prefers OpenAI).
+- It reuses an API key you already have: OpenAI → `gpt-4o-mini`, Sarvam → `sarvam-m`, Gemini → your configured Gemini model. Cost is a tiny fraction of the transcription itself.
+- **Mix and match:** transcribe with Sarvam, polish with GPT or Gemini — just set both keys and pick *Maiboli: Rewrite Provider* (`auto` picks the first key you have: OpenAI, then Sarvam, then Gemini).
+- The 29s auto-split exists **only for Sarvam** (their API limit). Whisper and Gemini always get your full recording in one piece.
 - With `gemini` as provider, polishing happens inside the same call — no separate step.
 - Off = raw transcription, exactly as you spoke it. If a rewrite ever fails, you get the raw version automatically.
 

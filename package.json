@@ -2,7 +2,7 @@
   "name": "maiboli",
   "displayName": "Maiboli (VoiceBridge — Speak to Code)",
   "description": "Speak in your mother tongue — Hindi, Marathi, Spanish, and 55+ more languages — and get English text at your cursor. Works in code files, terminals, and AI chat boxes.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "verve",
   "icon": "icon.png",
   "galleryBanner": {
@@ -51,50 +51,59 @@
     "configuration": {
       "title": "Maiboli",
       "properties": {
-        "maiboli.rewrite": {
-          "type": "boolean",
-          "default": false,
-          "description": "Polish the transcribed English with an AI rewrite (fixes grammar, removes fillers, joins broken sentences). Uses your OpenAI key (gpt-4o-mini) or Sarvam key (sarvam-m). Toggle quickly via the 'Maiboli: Toggle AI Rewrite' command."
-        },
         "maiboli.provider": {
+          "order": 1,
           "type": "string",
           "enum": ["whisper", "sarvam", "gemini"],
           "default": "whisper",
           "description": "Which speech engine to use. 'whisper' = OpenAI (any of 55+ languages -> English). 'sarvam' = Sarvam AI (best for Indian languages and Hinglish). 'gemini' = Google Gemini (audio -> English in one call, polishes too when Rewrite is on; has a free tier)."
         },
-        "maiboli.rewriteProvider": {
-          "type": "string",
-          "enum": ["auto", "openai", "sarvam"],
-          "default": "auto",
-          "description": "Which AI polishes the text when Rewrite is on. 'auto' prefers OpenAI (gpt-4o-mini) if that key is set, else Sarvam (sarvam-m). Not used when provider = gemini (it polishes in the same call)."
-        },
-        "maiboli.geminiApiKey": {
-          "type": "string",
-          "default": "",
-          "description": "Your Google Gemini API key (used when provider = gemini). Free tier at aistudio.google.com."
-        },
-        "maiboli.geminiModel": {
-          "type": "string",
-          "default": "gemini-2.5-flash",
-          "description": "Gemini model for provider = gemini (e.g. gemini-2.5-flash, or a newer flash model)."
-        },
         "maiboli.openaiApiKey": {
+          "order": 2,
           "type": "string",
           "default": "",
-          "description": "Your OpenAI API key (used when provider = whisper)."
+          "description": "Your OpenAI API key (for provider = whisper, and for GPT polishing)."
         },
         "maiboli.sarvamApiKey": {
+          "order": 3,
           "type": "string",
           "default": "",
-          "description": "Your Sarvam API key (used when provider = sarvam)."
+          "description": "Your Sarvam API key (for provider = sarvam, and for sarvam-m polishing)."
+        },
+        "maiboli.geminiApiKey": {
+          "order": 4,
+          "type": "string",
+          "default": "",
+          "description": "Your Google Gemini API key (for provider = gemini, and for Gemini polishing). Free tier at aistudio.google.com."
+        },
+        "maiboli.rewrite": {
+          "order": 5,
+          "type": "boolean",
+          "default": false,
+          "description": "Polish the transcribed English with an AI rewrite (fixes grammar, removes fillers, joins broken sentences). Toggle quickly via the 'Maiboli: Toggle AI Rewrite' command."
+        },
+        "maiboli.rewriteProvider": {
+          "order": 6,
+          "type": "string",
+          "enum": ["auto", "openai", "sarvam", "gemini"],
+          "default": "auto",
+          "description": "Which AI polishes the text when Rewrite is on. 'auto' picks the first key you have set, preferring OpenAI (gpt-4o-mini), then Sarvam (sarvam-m), then Gemini. Not used when provider = gemini (it polishes in the same call)."
+        },
+        "maiboli.geminiModel": {
+          "order": 7,
+          "type": "string",
+          "default": "gemini-2.5-flash",
+          "description": "Gemini model used for transcription and polishing (e.g. gemini-2.5-flash, or a newer flash model)."
         },
         "maiboli.recorder": {
+          "order": 8,
           "type": "string",
           "enum": ["sox", "ffmpeg"],
           "default": "sox",
           "description": "Which tool records your mic. 'sox' is simplest and works on Mac + Windows. 'ffmpeg' is Mac-only."
         },
         "maiboli.recorderPath": {
+          "order": 9,
           "type": "string",
           "default": "",
           "description": "Optional: full path to sox/ffmpeg if VS Code can't find it (e.g. /opt/homebrew/bin/sox or C:\\Program Files (x86)\\sox-14-4-2\\sox.exe)."
