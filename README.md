@@ -40,6 +40,14 @@ AI coding assistants speak English. Millions of great developers think in someth
 
 **Tip:** use the keyboard shortcut, not the mouse — clicking the status bar button moves your cursor out of chat boxes.
 
+## Optional: AI rewrite ✨
+
+Dictated text can come out slightly rough — fillers, grammar slips, broken sentence joins. Turn on **AI rewrite** and Maiboli passes the English through a small LLM that polishes it while keeping your meaning and technical terms:
+
+- Toggle it from the Command Palette: **Maiboli: Toggle AI Rewrite** (or Settings → *Maiboli: Rewrite*).
+- It reuses the API key you already have: OpenAI key → `gpt-4o-mini`, Sarvam key → `sarvam-m`. Cost is a tiny fraction of the transcription itself.
+- Off = raw transcription, exactly as you spoke it. If a rewrite ever fails, you get the raw version automatically.
+
 ## Supported languages
 
 - **Whisper mode:** auto-detects the spoken language — Hindi, Marathi, Tamil, Telugu, Bengali, Urdu, Spanish, Portuguese, French, German, Japanese, Korean, Arabic, and [40+ more](https://platform.openai.com/docs/guides/speech-to-text). Output is always English.

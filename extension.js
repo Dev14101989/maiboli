@@ -28,6 +28,21 @@ function activate(context) {
     }
   );
   context.subscriptions.push(cmd);
+
+  const toggleRewrite = vscode.commands.registerCommand(
+    "maiboli.toggleRewrite",
+    async () => {
+      const cfg = vscode.workspace.getConfiguration("maiboli");
+      const next = !cfg.get("rewrite", false);
+      await cfg.update("rewrite", next, vscode.ConfigurationTarget.Global);
+      vscode.window.showInformationMessage(
+        next
+          ? "Maiboli: AI rewrite ON — dictations will be polished."
+          : "Maiboli: AI rewrite OFF — raw transcription."
+      );
+    }
+  );
+  context.subscriptions.push(toggleRewrite);
 }
 
 function updateStatus() {
@@ -133,7 +148,7 @@ async function transcribeFile() {
     const cfg = vscode.workspace.getConfiguration("maiboli");
     const provider = cfg.get("provider", "whisper");
 
-    const text = await vscode.window.withProgress(
+    let text = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: `Maiboli: transcribing (${provider})…`,
@@ -141,6 +156,17 @@ async function transcribeFile() {
       () =>
         provider === "sarvam" ? sarvamLong(buffer, cfg) : whisper(buffer, cfg)
     );
+
+    if (text && cfg.get("rewrite", false)) {
+      text = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Maiboli: polishing…",
+        },
+        // On any rewrite failure, fall back to the raw transcription.
+        () => rewrite(text, cfg).catch(() => text)
+      );
+    }
 
     if (text) insertText(text);
     else vscode.window.showWarningMessage("Maiboli: no speech detected.");
@@ -198,6 +224,66 @@ async function sarvam(buffer, cfg) {
   if (!res.ok) throw new Error(`Sarvam ${res.status}: ${await res.text()}`);
   const json = await res.json();
   return (json.transcript || json.text || "").trim();
+}
+
+// Polish dictated text with a small LLM pass, using whichever API key the
+// user already has (OpenAI -> gpt-4o-mini, else Sarvam -> sarvam-m).
+async function rewrite(text, cfg) {
+  const system =
+    "You clean up dictated speech-to-text output. Rewrite the user's text " +
+    "into clear, natural English: fix grammar and punctuation, remove filler " +
+    "words, and smoothly join broken sentence fragments. Preserve the " +
+    "meaning, tone, and all technical terms. Return ONLY the rewritten text " +
+    "with no comments or quotes.";
+
+  const openaiKey = cfg.get("openaiApiKey");
+  if (openaiKey) {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openaiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: text },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`OpenAI ${res.status}`);
+    const json = await res.json();
+    const out = (json.choices?.[0]?.message?.content || "").trim();
+    return out || text;
+  }
+
+  const sarvamKey = cfg.get("sarvamApiKey");
+  if (sarvamKey) {
+    const res = await fetch("https://api.sarvam.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sarvamKey}`,
+        "api-subscription-key": sarvamKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "sarvam-m",
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: text },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Sarvam ${res.status}`);
+    const json = await res.json();
+    const out = (json.choices?.[0]?.message?.content || "").trim();
+    return out || text;
+  }
+
+  return text;
 }
 
 async function insertText(text) {
