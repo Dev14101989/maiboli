@@ -2,7 +2,7 @@
   "name": "maiboli",
   "displayName": "Maiboli (VoiceBridge — Speak to Code)",
   "description": "Speak in your mother tongue — Hindi, Marathi, Spanish, and 55+ more languages — and get English text at your cursor. Works in code files, terminals, and AI chat boxes.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "verve",
   "icon": "icon.png",
   "galleryBanner": {
@@ -92,8 +92,8 @@
         "maiboli.geminiModel": {
           "order": 7,
           "type": "string",
-          "default": "gemini-2.5-flash",
-          "description": "Gemini model used for transcription and polishing (e.g. gemini-2.5-flash, or a newer flash model)."
+          "default": "gemini-3.5-flash",
+          "description": "Gemini model used for transcription and polishing. Use a current flash model (e.g. gemini-3.5-flash, gemini-3.6-flash); avoid -live/-tts variants."
         },
         "maiboli.recorder": {
           "order": 8,

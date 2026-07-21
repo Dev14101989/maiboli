@@ -182,6 +182,20 @@ async function transcribeFile() {
   }
 }
 
+// Retry transient failures (rate limits, overloaded servers) with a short
+// backoff before giving up — a 503 usually clears within seconds.
+async function fetchWithRetry(url, options, tries = 3) {
+  let res;
+  for (let i = 0; i < tries; i++) {
+    res = await fetch(url, options);
+    if (res.ok || ![429, 500, 502, 503, 504].includes(res.status)) return res;
+    if (i < tries - 1) {
+      await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+    }
+  }
+  return res;
+}
+
 // OpenAI Whisper /translations -> English (auto-detects 55+ spoken languages)
 async function whisper(buffer, cfg) {
   const key = cfg.get("openaiApiKey");
@@ -191,7 +205,7 @@ async function whisper(buffer, cfg) {
   form.append("file", new Blob([buffer], { type: "audio/wav" }), "audio.wav");
   form.append("model", "whisper-1");
 
-  const res = await fetch("https://api.openai.com/v1/audio/translations", {
+  const res = await fetchWithRetry("https://api.openai.com/v1/audio/translations", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
     body: form,
@@ -221,7 +235,7 @@ async function sarvam(buffer, cfg) {
   form.append("file", new Blob([buffer], { type: "audio/wav" }), "audio.wav");
   form.append("model", "saaras:v2.5");
 
-  const res = await fetch("https://api.sarvam.ai/speech-to-text-translate", {
+  const res = await fetchWithRetry("https://api.sarvam.ai/speech-to-text-translate", {
     method: "POST",
     headers: { "api-subscription-key": key },
     body: form,
@@ -236,7 +250,7 @@ async function sarvam(buffer, cfg) {
 async function gemini(buffer, cfg) {
   const key = cfg.get("geminiApiKey");
   if (!key) throw new Error("Set maiboli.geminiApiKey in Settings.");
-  const model = cfg.get("geminiModel", "gemini-2.5-flash");
+  const model = cfg.get("geminiModel") || "gemini-3.5-flash";
 
   const instruction = cfg.get("rewrite", false)
     ? "Listen to this audio. The speaker may use any language, or mix " +
@@ -249,7 +263,7 @@ async function gemini(buffer, cfg) {
       "faithfully into natural English, without adding or dropping " +
       "anything. Output ONLY the English text — no comments, no quotes.";
 
-  const res = await fetch(
+  const res = await fetchWithRetry(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
@@ -290,7 +304,7 @@ async function rewrite(text, cfg) {
   const pref = cfg.get("rewriteProvider", "auto");
   const openaiKey = cfg.get("openaiApiKey");
   if ((pref === "auto" || pref === "openai") && openaiKey) {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetchWithRetry("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${openaiKey}`,
@@ -313,7 +327,7 @@ async function rewrite(text, cfg) {
 
   const sarvamKey = cfg.get("sarvamApiKey");
   if ((pref === "auto" || pref === "sarvam") && sarvamKey) {
-    const res = await fetch("https://api.sarvam.ai/v1/chat/completions", {
+    const res = await fetchWithRetry("https://api.sarvam.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${sarvamKey}`,
@@ -337,8 +351,8 @@ async function rewrite(text, cfg) {
 
   const geminiKey = cfg.get("geminiApiKey");
   if ((pref === "auto" || pref === "gemini") && geminiKey) {
-    const model = cfg.get("geminiModel", "gemini-2.5-flash");
-    const res = await fetch(
+    const model = cfg.get("geminiModel") || "gemini-3.5-flash";
+    const res = await fetchWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
