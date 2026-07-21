@@ -30,6 +30,7 @@ AI coding assistants speak English. Millions of great developers think in someth
    |---|---|---|
    | `whisper` (default) | Any of 55+ languages → English | [platform.openai.com](https://platform.openai.com) |
    | `sarvam` | Indian languages + Hinglish (code-mixed) → English | [dashboard.sarvam.ai](https://dashboard.sarvam.ai) — free credits on signup |
+   | `gemini` | Any language → English in one call; polishes too when Rewrite is on; no 30s limit | [aistudio.google.com](https://aistudio.google.com) — free tier |
 
 ## Use
 
@@ -46,6 +47,8 @@ Dictated text can come out slightly rough — fillers, grammar slips, broken sen
 
 - Toggle it from the Command Palette: **Maiboli: Toggle AI Rewrite** (or Settings → *Maiboli: Rewrite*).
 - It reuses the API key you already have: OpenAI key → `gpt-4o-mini`, Sarvam key → `sarvam-m`. Cost is a tiny fraction of the transcription itself.
+- **Mix and match:** transcribe with Sarvam, polish with GPT — just set both keys. *Maiboli: Rewrite Provider* forces a specific polisher (`auto` prefers OpenAI).
+- With `gemini` as provider, polishing happens inside the same call — no separate step.
 - Off = raw transcription, exactly as you spoke it. If a rewrite ever fails, you get the raw version automatically.
 
 ## Supported languages

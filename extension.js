@@ -154,10 +154,15 @@ async function transcribeFile() {
         title: `Maiboli: transcribing (${provider})…`,
       },
       () =>
-        provider === "sarvam" ? sarvamLong(buffer, cfg) : whisper(buffer, cfg)
+        provider === "sarvam"
+          ? sarvamLong(buffer, cfg)
+          : provider === "gemini"
+            ? gemini(buffer, cfg)
+            : whisper(buffer, cfg)
     );
 
-    if (text && cfg.get("rewrite", false)) {
+    // Gemini polishes in the same call (see prompt) — no separate pass.
+    if (text && provider !== "gemini" && cfg.get("rewrite", false)) {
       text = await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
@@ -226,8 +231,54 @@ async function sarvam(buffer, cfg) {
   return (json.transcript || json.text || "").trim();
 }
 
-// Polish dictated text with a small LLM pass, using whichever API key the
-// user already has (OpenAI -> gpt-4o-mini, else Sarvam -> sarvam-m).
+// Google Gemini: audio in -> English out in ONE call (auto language
+// detection; polishes too when maiboli.rewrite is on). No 30s limit.
+async function gemini(buffer, cfg) {
+  const key = cfg.get("geminiApiKey");
+  if (!key) throw new Error("Set maiboli.geminiApiKey in Settings.");
+  const model = cfg.get("geminiModel", "gemini-2.5-flash");
+
+  const instruction = cfg.get("rewrite", false)
+    ? "Listen to this audio. The speaker may use any language, or mix " +
+      "languages mid-sentence. Translate what they said into clear, " +
+      "polished English: fix grammar, remove filler words, and join broken " +
+      "fragments, while preserving the meaning, tone, and all technical " +
+      "terms. Output ONLY the final English text — no comments, no quotes."
+    : "Listen to this audio. The speaker may use any language, or mix " +
+      "languages mid-sentence. Transcribe what they said and translate it " +
+      "faithfully into natural English, without adding or dropping " +
+      "anything. Output ONLY the English text — no comments, no quotes.";
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                inline_data: {
+                  mime_type: "audio/wav",
+                  data: buffer.toString("base64"),
+                },
+              },
+              { text: instruction },
+            ],
+          },
+        ],
+      }),
+    }
+  );
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  const parts = json.candidates?.[0]?.content?.parts || [];
+  return parts.map((p) => p.text || "").join("").trim();
+}
+
+// Polish dictated text with a small LLM pass. maiboli.rewriteProvider picks
+// the engine; "auto" prefers OpenAI (gpt-4o-mini) over Sarvam (sarvam-m).
 async function rewrite(text, cfg) {
   const system =
     "You clean up dictated speech-to-text output. Rewrite the user's text " +
@@ -236,8 +287,9 @@ async function rewrite(text, cfg) {
     "meaning, tone, and all technical terms. Return ONLY the rewritten text " +
     "with no comments or quotes.";
 
+  const pref = cfg.get("rewriteProvider", "auto");
   const openaiKey = cfg.get("openaiApiKey");
-  if (openaiKey) {
+  if (pref !== "sarvam" && openaiKey) {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -260,7 +312,7 @@ async function rewrite(text, cfg) {
   }
 
   const sarvamKey = cfg.get("sarvamApiKey");
-  if (sarvamKey) {
+  if (pref !== "openai" && sarvamKey) {
     const res = await fetch("https://api.sarvam.ai/v1/chat/completions", {
       method: "POST",
       headers: {
