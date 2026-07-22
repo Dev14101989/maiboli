@@ -76,10 +76,14 @@ function startRecording() {
     args = ["-q", "-d", "-r", "16000", "-c", "1", "-b", "16", audioPath];
   }
 
-  // GUI apps on macOS often miss Homebrew paths — add them so sox/ffmpeg are found.
+  // GUI apps on macOS often miss Homebrew paths — add them so sox/ffmpeg are
+  // found. On Windows, sox needs AUDIODRIVER=waveaudio to find the mic.
   const env = {
     ...process.env,
     PATH: `${process.env.PATH || ""}:/opt/homebrew/bin:/usr/local/bin`,
+    ...(process.platform === "win32" && {
+      AUDIODRIVER: process.env.AUDIODRIVER || "waveaudio",
+    }),
   };
 
   try {
@@ -87,6 +91,13 @@ function startRecording() {
   } catch (e) {
     vscode.window.showErrorMessage("Maiboli: " + e.message);
     return;
+  }
+
+  let recErrOutput = "";
+  if (recProc.stderr) {
+    recProc.stderr.on("data", (d) => {
+      recErrOutput += d.toString();
+    });
   }
 
   recProc.on("error", (err) => {
@@ -101,8 +112,17 @@ function startRecording() {
     }
   });
 
-  recProc.on("close", () => {
-    if (pendingTranscribe) {
+  recProc.on("close", (code) => {
+    if (recording && code !== 0) {
+      // Recorder died while we still thought we were recording — surface it
+      // instead of silently showing "Recording…" forever.
+      recording = false;
+      pendingTranscribe = false;
+      updateStatus();
+      const detail =
+        recErrOutput.trim().split("\n").pop() || `recorder exited (code ${code})`;
+      vscode.window.showErrorMessage("Maiboli: recording failed — " + detail);
+    } else if (pendingTranscribe) {
       pendingTranscribe = false;
       transcribeFile();
     }

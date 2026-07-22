@@ -69,6 +69,7 @@ Dictated text can come out slightly rough — fillers, grammar slips, broken sen
 |---|---|
 | `'sox' not found` | Install sox (step 2), reload VS Code. Windows: set *Maiboli: Recorder Path* to the full `sox.exe` path. |
 | `recording was empty` | Allow VS Code to use the microphone in system privacy settings. |
+| `recording failed — …` | The recorder itself errored; the message includes sox's reason (e.g. mic blocked or no audio device). On Windows, Maiboli sets `AUDIODRIVER=waveaudio` automatically. |
 | "Copied to clipboard…" instead of auto-paste (Mac) | Grant the Accessibility permission above. |
 | Text goes to the wrong place | Use the keyboard shortcut instead of clicking the 🎤 button. |
 
