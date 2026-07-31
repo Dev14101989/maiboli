@@ -1,7 +1,7 @@
 {
   "name": "maiboli-desktop",
-  "productName": "Maiboli",
-  "version": "0.4.1",
+  "productName": "Maiboli 5min",
+  "version": "0.4.2",
   "description": "Speak your mother tongue, get English text at your cursor — anywhere on your computer.",
   "main": "main.js",
   "license": "MIT",
@@ -20,8 +20,8 @@
     "electron-builder": "^25.0.0"
   },
   "build": {
-    "appId": "app.maiboli.desktop",
-    "productName": "Maiboli",
+    "appId": "app.maiboli.desktop.limit5",
+    "productName": "Maiboli 5min",
     "directories": {
       "output": "dist"
     },

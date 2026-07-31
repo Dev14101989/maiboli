@@ -18,7 +18,7 @@ const { transcribe, makeWav } = require("./transcribe");
 
 // Hardcoded maximum recording length in seconds; null = unlimited.
 // The "Maiboli 5min" edition sets this to 300.
-const MAX_RECORD_SECONDS = null;
+const MAX_RECORD_SECONDS = 300;
 
 let settings = null;
 let tray = null;
