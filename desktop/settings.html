@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Maiboli Settings</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    margin: 0; padding: 20px 24px; font-size: 13px;
+  }
+  h1 { font-size: 16px; margin: 0 0 14px; }
+  label { display: block; margin: 12px 0 4px; font-weight: 600; }
+  input, select {
+    width: 100%; box-sizing: border-box; padding: 7px 9px;
+    border-radius: 6px; border: 1px solid #8884; font-size: 13px;
+  }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .row input[type=checkbox] { width: auto; }
+  .row label { margin: 0; }
+  .hint { color: #888; font-size: 11.5px; margin-top: 3px; }
+  button {
+    margin-top: 20px; width: 100%; padding: 9px; font-size: 14px;
+    font-weight: 600; border: none; border-radius: 8px;
+    background: #0c5a6e; color: #fff; cursor: pointer;
+  }
+  button:active { opacity: .8; }
+  #saved { text-align: center; color: #2a9d4a; margin-top: 8px; height: 16px; }
+</style>
+</head>
+<body>
+  <h1>🎤 Maiboli Settings</h1>
+
+  <label>Provider</label>
+  <select id="provider">
+    <option value="gemini">Gemini (Google) — free tier, polish built in</option>
+    <option value="whisper">Whisper (OpenAI)</option>
+    <option value="sarvam">Sarvam — best for Indian languages</option>
+  </select>
+
+  <label>Gemini API key</label>
+  <input id="geminiApiKey" type="password" placeholder="free key at aistudio.google.com">
+  <label>OpenAI API key</label>
+  <input id="openaiApiKey" type="password" placeholder="platform.openai.com">
+  <label>Sarvam API key</label>
+  <input id="sarvamApiKey" type="password" placeholder="dashboard.sarvam.ai">
+
+  <label>Gemini model</label>
+  <input id="geminiModel" placeholder="gemini-3.5-flash">
+
+  <div class="row">
+    <input id="rewrite" type="checkbox">
+    <label for="rewrite">AI rewrite — polish grammar &amp; remove fillers</label>
+  </div>
+
+  <label>Keyboard shortcut</label>
+  <input id="shortcut" placeholder="CommandOrControl+Alt+M">
+  <div class="hint">Electron format, e.g. CommandOrControl+Alt+M or Ctrl+Shift+Space</div>
+
+  <button id="save">Save</button>
+  <div id="saved"></div>
+
+<script>
+  const { ipcRenderer } = require("electron");
+  const FIELDS = ["provider","geminiApiKey","openaiApiKey","sarvamApiKey","geminiModel","shortcut"];
+
+  ipcRenderer.invoke("settings-get").then((s) => {
+    for (const f of FIELDS) document.getElementById(f).value = s[f] || "";
+    document.getElementById("rewrite").checked = !!s.rewrite;
+  });
+
+  document.getElementById("save").onclick = async () => {
+    const next = {};
+    for (const f of FIELDS) next[f] = document.getElementById(f).value.trim();
+    next.rewrite = document.getElementById("rewrite").checked;
+    await ipcRenderer.invoke("settings-save", next);
+    const el = document.getElementById("saved");
+    el.textContent = "Saved ✓";
+    setTimeout(() => (el.textContent = ""), 1800);
+  };
+</script>
+</body>
+</html>

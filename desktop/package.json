@@ -1,0 +1,54 @@
+{
+  "name": "maiboli-desktop",
+  "productName": "Maiboli",
+  "version": "0.4.0",
+  "description": "Speak your mother tongue, get English text at your cursor — anywhere on your computer.",
+  "main": "main.js",
+  "license": "MIT",
+  "author": "Maiboli contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dev14101989/maiboli.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "app.maiboli.desktop",
+    "productName": "Maiboli",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "store.js",
+      "transcribe.js",
+      "recorder.html",
+      "settings.html",
+      "assets/**"
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Maiboli needs the microphone for voice dictation."
+      }
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "runAfterFinish": true,
+      "createDesktopShortcut": false
+    }
+  }
+}

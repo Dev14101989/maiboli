@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Maiboli recorder</title></head>
+<body>
+<script>
+  // Hidden window: records the mic as 16kHz mono PCM and ships a finished
+  // WAV data buffer to the main process. No external recorder needed.
+  const { ipcRenderer } = require("electron");
+
+  let ctx = null;
+  let stream = null;
+  let source = null;
+  let proc = null;
+  let samples = [];
+
+  ipcRenderer.on("rec-start", async () => {
+    try {
+      samples = [];
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+      });
+      ctx = new AudioContext({ sampleRate: 16000 });
+      source = ctx.createMediaStreamSource(stream);
+      proc = ctx.createScriptProcessor(4096, 1, 1);
+      proc.onaudioprocess = (e) => {
+        samples.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      };
+      source.connect(proc);
+      proc.connect(ctx.destination);
+      ipcRenderer.send("rec-started");
+    } catch (e) {
+      cleanup();
+      ipcRenderer.send("rec-error", e.message || String(e));
+    }
+  });
+
+  ipcRenderer.on("rec-stop", () => {
+    try {
+      const total = samples.reduce((n, c) => n + c.length, 0);
+      const pcm = new Int16Array(total);
+      let off = 0;
+      for (const chunk of samples) {
+        for (let i = 0; i < chunk.length; i++) {
+          const v = Math.max(-1, Math.min(1, chunk[i]));
+          pcm[off++] = v < 0 ? v * 0x8000 : v * 0x7fff;
+        }
+      }
+      samples = [];
+      cleanup();
+      ipcRenderer.send("rec-audio", Buffer.from(pcm.buffer));
+    } catch (e) {
+      cleanup();
+      ipcRenderer.send("rec-error", e.message || String(e));
+    }
+  });
+
+  function cleanup() {
+    try { if (proc) { proc.disconnect(); proc.onaudioprocess = null; } } catch (_) {}
+    try { if (source) source.disconnect(); } catch (_) {}
+    try { if (ctx) ctx.close(); } catch (_) {}
+    try { if (stream) stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+    proc = source = ctx = stream = null;
+  }
+</script>
+</body>
+</html>

@@ -14,6 +14,8 @@ Press one shortcut, talk naturally (mixed languages like Hinglish work too), pre
 
 Works on **macOS and Windows**.
 
+> **🆕 Easiest way to get Maiboli: the [Desktop app](desktop/)** — a single installer (no sox, no terminal, no dependencies) that puts a mic icon in your system tray. Click or press a shortcut, speak, and English text appears at your cursor in **any** app, not just VS Code. Download from [Releases](https://github.com/Dev14101989/maiboli/releases). The VS Code extension below is still available if you prefer something editor-only.
+
 ## Why?
 
 AI coding assistants speak English. Millions of great developers think in something else. Maiboli is the bridge — describe your problem out loud in the language you think in, and prompt Copilot/Claude in clean English without typing a word.
