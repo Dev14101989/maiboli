@@ -16,6 +16,10 @@ const path = require("path");
 const store = require("./store");
 const { transcribe, makeWav } = require("./transcribe");
 
+// Hardcoded maximum recording length in seconds; null = unlimited.
+// The "Maiboli 5min" edition sets this to 300.
+const MAX_RECORD_SECONDS = null;
+
 let settings = null;
 let tray = null;
 let recorderWin = null;
@@ -23,6 +27,7 @@ let settingsWin = null;
 let floatWin = null;
 let recording = false;
 let busy = false;
+let recTimer = null;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
@@ -81,6 +86,17 @@ function createRecorderWindow() {
   recorderWin.loadFile("recorder.html");
 }
 
+function stopRecording() {
+  if (!recording) return;
+  if (recTimer) {
+    clearTimeout(recTimer);
+    recTimer = null;
+  }
+  recording = false;
+  updateTray();
+  recorderWin.webContents.send("rec-stop");
+}
+
 async function toggle() {
   if (busy) return;
   if (!recording) {
@@ -93,18 +109,30 @@ async function toggle() {
     }
     recorderWin.webContents.send("rec-start");
   } else {
-    recording = false;
-    updateTray();
-    recorderWin.webContents.send("rec-stop");
+    stopRecording();
   }
 }
 
 ipcMain.on("rec-started", () => {
   recording = true;
   updateTray();
+  if (MAX_RECORD_SECONDS) {
+    recTimer = setTimeout(() => {
+      if (recording) {
+        notify(
+          `Reached the ${Math.round(MAX_RECORD_SECONDS / 60)}-minute recording limit — transcribing…`
+        );
+        stopRecording();
+      }
+    }, MAX_RECORD_SECONDS * 1000);
+  }
 });
 
 ipcMain.on("rec-error", (_e, msg) => {
+  if (recTimer) {
+    clearTimeout(recTimer);
+    recTimer = null;
+  }
   recording = false;
   busy = false;
   updateTray();
