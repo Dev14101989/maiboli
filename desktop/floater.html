@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body {
+    margin: 0; padding: 0; background: transparent; overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+  }
+  #btn {
+    width: 52px; height: 52px; margin: 2px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; cursor: grab;
+    background: linear-gradient(160deg, #ff8c28, #0c5a6e);
+    box-shadow: 0 2px 10px rgba(0,0,0,.35);
+    transition: background .15s;
+  }
+  #btn:active { cursor: grabbing; }
+  #btn.rec {
+    background: #e8413c;
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  #btn.busy {
+    background: #e69b1f;
+    animation: spin-bg 1s linear infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(0.88); }
+  }
+  @keyframes spin-bg {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .55; }
+  }
+</style>
+</head>
+<body>
+  <div id="btn">🎤</div>
+<script>
+  const { ipcRenderer } = require("electron");
+  const btn = document.getElementById("btn");
+
+  // Main process decides click-vs-drag from cursor travel distance.
+  btn.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    ipcRenderer.send("float-down", { x: e.clientX, y: e.clientY });
+  });
+  window.addEventListener("mouseup", (e) => {
+    if (e.button !== 0) return;
+    ipcRenderer.send("float-up");
+  });
+
+  ipcRenderer.on("state", (_e, state) => {
+    btn.className = state === "rec" ? "rec" : state === "busy" ? "busy" : "";
+    btn.textContent = state === "busy" ? "⏳" : "🎤";
+  });
+</script>
+</body>
+</html>

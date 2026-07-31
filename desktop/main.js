@@ -9,6 +9,7 @@ const {
   Notification,
   nativeImage,
   systemPreferences,
+  screen,
 } = require("electron");
 const cp = require("child_process");
 const path = require("path");
@@ -19,6 +20,7 @@ let settings = null;
 let tray = null;
 let recorderWin = null;
 let settingsWin = null;
+let floatWin = null;
 let recording = false;
 let busy = false;
 
@@ -40,13 +42,20 @@ function trayIcon() {
 }
 
 function updateTray() {
-  if (!tray) return;
-  tray.setImage(trayIcon());
-  tray.setToolTip(
-    recording
-      ? "Maiboli — recording… (click or shortcut to stop)"
-      : `Maiboli — click or ${prettyShortcut()} to dictate`
-  );
+  if (tray) {
+    tray.setImage(trayIcon());
+    tray.setToolTip(
+      recording
+        ? "Maiboli — recording… (click or shortcut to stop)"
+        : `Maiboli — click or ${prettyShortcut()} to dictate`
+    );
+  }
+  if (floatWin) {
+    floatWin.webContents.send(
+      "state",
+      busy ? "busy" : recording ? "rec" : "idle"
+    );
+  }
 }
 
 function prettyShortcut() {
@@ -152,6 +161,75 @@ function pasteKeystroke() {
   });
 }
 
+// ---- Floating mic button (drag anywhere, click to dictate) ----
+let dragTimer = null;
+let dragOffset = null;
+let dragStartPt = null;
+
+function createFloatWindow() {
+  if (floatWin) return;
+  const area = screen.getPrimaryDisplay().workArea;
+  const pos = settings.floatPos || {
+    x: area.x + area.width - 76,
+    y: area.y + area.height - 130,
+  };
+  floatWin = new BrowserWindow({
+    width: 56,
+    height: 56,
+    x: Math.round(pos.x),
+    y: Math.round(pos.y),
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: false,
+    focusable: false,
+    fullscreenable: false,
+    webPreferences: { nodeIntegration: true, contextIsolation: false },
+  });
+  floatWin.setAlwaysOnTop(true, "screen-saver");
+  if (process.platform === "darwin") {
+    floatWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  }
+  floatWin.loadFile("floater.html");
+  floatWin.on("closed", () => (floatWin = null));
+}
+
+function destroyFloatWindow() {
+  if (floatWin) floatWin.close();
+  floatWin = null;
+}
+
+ipcMain.on("float-down", (_e, offset) => {
+  dragOffset = offset;
+  dragStartPt = screen.getCursorScreenPoint();
+  clearInterval(dragTimer);
+  dragTimer = setInterval(() => {
+    if (!floatWin || !dragOffset) return;
+    const p = screen.getCursorScreenPoint();
+    floatWin.setPosition(
+      Math.round(p.x - dragOffset.x),
+      Math.round(p.y - dragOffset.y)
+    );
+  }, 16);
+});
+
+ipcMain.on("float-up", () => {
+  clearInterval(dragTimer);
+  dragTimer = null;
+  dragOffset = null;
+  if (!floatWin || !dragStartPt) return;
+  const p = screen.getCursorScreenPoint();
+  const travel = Math.hypot(p.x - dragStartPt.x, p.y - dragStartPt.y);
+  dragStartPt = null;
+  const [x, y] = floatWin.getPosition();
+  settings.floatPos = { x, y };
+  store.save(settings);
+  if (travel < 4) toggle(); // barely moved -> it was a click
+});
+
 // ---- Settings window ----
 function openSettings() {
   if (settingsWin) {
@@ -204,6 +282,17 @@ function buildMenu() {
         store.save(settings);
       },
     },
+    {
+      label: "Floating mic button",
+      type: "checkbox",
+      checked: settings.floatEnabled !== false,
+      click: (item) => {
+        settings.floatEnabled = item.checked;
+        store.save(settings);
+        if (item.checked) createFloatWindow();
+        else destroyFloatWindow();
+      },
+    },
     { label: "Settings…", click: openSettings },
     { type: "separator" },
     { label: `Shortcut: ${prettyShortcut()}`, enabled: false },
@@ -217,6 +306,7 @@ app.whenReady().then(() => {
   if (process.platform === "win32") app.setAppUserModelId("app.maiboli.desktop");
 
   createRecorderWindow();
+  if (settings.floatEnabled !== false) createFloatWindow();
 
   tray = new Tray(trayIcon());
   updateTray();

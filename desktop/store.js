@@ -12,6 +12,8 @@ const DEFAULTS = {
   rewrite: false,
   rewriteProvider: "auto",
   shortcut: "CommandOrControl+Alt+M",
+  floatEnabled: true,
+  floatPos: null,
 };
 
 function file() {
