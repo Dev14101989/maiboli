@@ -194,13 +194,31 @@ let dragTimer = null;
 let dragOffset = null;
 let dragStartPt = null;
 
+function defaultFloatPos() {
+  const area = screen.getPrimaryDisplay().workArea;
+  return { x: area.x + area.width - 76, y: area.y + area.height - 130 };
+}
+
+// A remembered position can be outside every screen after a monitor is
+// unplugged or the resolution changes — pull the bubble back if so.
+function clampFloatPos(pos) {
+  if (!pos) return defaultFloatPos();
+  const SIZE = 56, MARGIN = 10;
+  const visible = screen.getAllDisplays().some((d) => {
+    const a = d.workArea;
+    return (
+      pos.x + SIZE - MARGIN >= a.x &&
+      pos.x + MARGIN <= a.x + a.width &&
+      pos.y + SIZE - MARGIN >= a.y &&
+      pos.y + MARGIN <= a.y + a.height
+    );
+  });
+  return visible ? pos : defaultFloatPos();
+}
+
 function createFloatWindow() {
   if (floatWin) return;
-  const area = screen.getPrimaryDisplay().workArea;
-  const pos = settings.floatPos || {
-    x: area.x + area.width - 76,
-    y: area.y + area.height - 130,
-  };
+  const pos = clampFloatPos(settings.floatPos);
   floatWin = new BrowserWindow({
     width: 56,
     height: 56,
@@ -228,6 +246,27 @@ function createFloatWindow() {
 function destroyFloatWindow() {
   if (floatWin) floatWin.close();
   floatWin = null;
+}
+
+function resetFloatPos() {
+  settings.floatPos = null;
+  store.save(settings);
+  const pos = defaultFloatPos();
+  if (floatWin) {
+    floatWin.setPosition(pos.x, pos.y);
+    floatWin.show();
+  } else if (settings.floatEnabled !== false) {
+    createFloatWindow();
+  }
+}
+
+// If screens change (monitor unplugged, resolution switch), make sure the
+// bubble is still somewhere visible.
+function ensureFloatVisible() {
+  if (!floatWin) return;
+  const [x, y] = floatWin.getPosition();
+  const pos = clampFloatPos({ x, y });
+  if (pos.x !== x || pos.y !== y) floatWin.setPosition(pos.x, pos.y);
 }
 
 ipcMain.on("float-down", (_e, offset) => {
@@ -321,6 +360,7 @@ function buildMenu() {
         else destroyFloatWindow();
       },
     },
+    { label: "Reset floating button position", click: resetFloatPos },
     { label: "Settings…", click: openSettings },
     { type: "separator" },
     { label: `Shortcut: ${prettyShortcut()}`, enabled: false },
@@ -343,6 +383,10 @@ app.whenReady().then(() => {
   // macOS: left-click toggles, hold Ctrl or right-click for the menu.
 
   registerShortcut();
+
+  screen.on("display-removed", ensureFloatVisible);
+  screen.on("display-added", ensureFloatVisible);
+  screen.on("display-metrics-changed", ensureFloatVisible);
 
   if (!settings.geminiApiKey && !settings.openaiApiKey && !settings.sarvamApiKey) {
     openSettings();

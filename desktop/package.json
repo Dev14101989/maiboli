@@ -1,7 +1,7 @@
 {
   "name": "maiboli-desktop",
   "productName": "Maiboli",
-  "version": "0.4.1",
+  "version": "0.4.3",
   "description": "Speak your mother tongue, get English text at your cursor — anywhere on your computer.",
   "main": "main.js",
   "license": "MIT",

@@ -48,4 +48,5 @@ A Settings window opens automatically:
 | "Recording failed — …" | Allow the Microphone permission in system privacy settings. |
 | Text only lands on the clipboard (Mac) | Enable Maiboli in System Settings → Privacy & Security → Accessibility. |
 | Shortcut doesn't work | Another app owns that combo — change it in Settings (e.g. `Ctrl+Shift+Space`). |
+| Floating mic bubble not visible | Right-click the tray icon → **Reset floating button position**. (Older builds: quit the app, set `"floatPos": null` in `%APPDATA%\Maiboli\settings.json`, reopen.) |
 | Gemini errors | Check the API key; model `gemini-3.5-flash` is the safe default. |
