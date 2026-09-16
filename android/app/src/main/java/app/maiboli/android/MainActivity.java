@@ -21,7 +21,7 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
   private SharedPreferences prefs;
-  private EditText keyEdit, modelEdit;
+  private EditText keyEdit, modelEdit, maxEdit, extEdit;
   private CheckBox rewriteBox;
   private RadioButton langEn, langHi, scriptRoman, scriptDeva;
 
@@ -66,6 +66,18 @@ public class MainActivity extends Activity {
     scriptGroup.addView(scriptRoman);
     scriptGroup.addView(scriptDeva);
     root.addView(scriptGroup);
+
+    root.addView(label("Max recording (minutes; blank = no limit)"));
+    maxEdit = new EditText(this);
+    maxEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
+    maxEdit.setText(prefs.getString("maxmin", "5"));
+    root.addView(maxEdit);
+
+    root.addView(label("Extension when time is up (minutes)"));
+    extEdit = new EditText(this);
+    extEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
+    extEdit.setText(prefs.getString("extmin", "5"));
+    root.addView(extEdit);
 
     rewriteBox = new CheckBox(this);
     rewriteBox.setText("AI rewrite — organize my points into clean order");
@@ -123,6 +135,8 @@ public class MainActivity extends Activity {
     prefs.edit()
         .putString("key", keyEdit.getText().toString().trim())
         .putString("model", modelEdit.getText().toString().trim())
+        .putString("maxmin", maxEdit.getText().toString().trim())
+        .putString("extmin", extEdit.getText().toString().trim())
         .putBoolean("rewrite", rewriteBox.isChecked())
         .putString("lang", langHi.isChecked() ? "hi" : "en")
         .putString("script", scriptDeva.isChecked() ? "deva" : "roman")

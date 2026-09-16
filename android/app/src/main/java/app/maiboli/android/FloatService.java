@@ -13,7 +13,6 @@ import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
-import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -26,6 +25,9 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,10 +35,10 @@ import java.io.ByteArrayOutputStream;
 
 public class FloatService extends Service {
   private static final int SAMPLE_RATE = 16000;
-  private static final int MAX_SECONDS = 600; // safety cap: 10 minutes
+  private static final int HARD_CAP_SECONDS = 3600; // absolute safety cap: 1 hour
 
   private WindowManager wm;
-  private TextView bubble;
+  private ImageView bubble;
   private WindowManager.LayoutParams lp;
   private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -45,6 +47,10 @@ public class FloatService extends Service {
   private AudioRecord recorder;
   private Thread recThread;
   private ByteArrayOutputStream pcm;
+
+  private final Runnable timeUp = this::showTimeUpPrompt;
+  private final Runnable promptTimeout = this::promptExpired;
+  private LinearLayout prompt;
 
   @Override public IBinder onBind(Intent i) { return null; }
 
@@ -77,12 +83,11 @@ public class FloatService extends Service {
     wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
     float d = getResources().getDisplayMetrics().density;
     int size = (int) (56 * d);
+    int pad = (int) (14 * d);
 
-    bubble = new TextView(this);
-    bubble.setText("🎤"); // microphone emoji
-    bubble.setTextSize(24);
-    bubble.setGravity(Gravity.CENTER);
-    bubble.setTypeface(Typeface.DEFAULT_BOLD);
+    bubble = new ImageView(this);
+    bubble.setImageResource(R.drawable.ic_mic);
+    bubble.setPadding(pad, pad, pad, pad);
     setBubbleColor(0xFF0C5A6E);
 
     SharedPreferences prefs = getSharedPreferences("maiboli", MODE_PRIVATE);
@@ -142,9 +147,9 @@ public class FloatService extends Service {
     main.post(() -> {
       if (bubble == null) return;
       switch (state) {
-        case "rec":  setBubbleColor(0xFFE8413C); bubble.setText("⏹"); break;   // red, stop square
-        case "busy": setBubbleColor(0xFFE69B1F); bubble.setText("⏳"); break;   // orange, hourglass
-        default:      setBubbleColor(0xFF0C5A6E); bubble.setText("🎤");
+        case "rec":  setBubbleColor(0xFFE8413C); bubble.setImageResource(R.drawable.ic_stop); break;
+        case "busy": setBubbleColor(0xFFE69B1F); bubble.setImageResource(R.drawable.ic_busy); break;
+        default:      setBubbleColor(0xFF0C5A6E); bubble.setImageResource(R.drawable.ic_mic);
       }
     });
   }
@@ -152,6 +157,16 @@ public class FloatService extends Service {
   private void toggle() {
     if (busy) return;
     if (!recording) startRecording(); else stopRecording();
+  }
+
+  private int minutesSetting(String key, int def) {
+    try {
+      String v = getSharedPreferences("maiboli", MODE_PRIVATE).getString(key, String.valueOf(def)).trim();
+      if (v.isEmpty()) return 0; // blank = no limit
+      return Math.max(0, Integer.parseInt(v));
+    } catch (Exception e) {
+      return def;
+    }
   }
 
   private void startRecording() {
@@ -166,22 +181,106 @@ public class FloatService extends Service {
     }
     recording = true;
     setState("rec");
+    int maxMin = minutesSetting("maxmin", 5);
+    if (maxMin > 0) main.postDelayed(timeUp, maxMin * 60_000L);
     pcm = new ByteArrayOutputStream();
     recThread = new Thread(() -> {
       byte[] buf = new byte[4096];
-      long maxBytes = (long) SAMPLE_RATE * 2 * MAX_SECONDS;
+      long maxBytes = (long) SAMPLE_RATE * 2 * HARD_CAP_SECONDS;
       while (recording && pcm.size() < maxBytes) {
         int n = recorder.read(buf, 0, buf.length);
         if (n > 0) pcm.write(buf, 0, n);
       }
-      if (recording) main.post(this::stopRecording); // hit the cap
+      if (recording) main.post(this::stopRecording); // hit the hard cap
     });
     recThread.start();
+  }
+
+  // ---- Time-limit prompt ----
+
+  private void showTimeUpPrompt() {
+    if (!recording || prompt != null) return;
+    int extMin = Math.max(1, minutesSetting("extmin", 5));
+    float d = getResources().getDisplayMetrics().density;
+    int pad = (int) (18 * d);
+
+    prompt = new LinearLayout(this);
+    prompt.setOrientation(LinearLayout.VERTICAL);
+    prompt.setPadding(pad, pad, pad, pad);
+    GradientDrawable bg = new GradientDrawable();
+    bg.setColor(0xFF263238);
+    bg.setCornerRadius(16 * d);
+    prompt.setBackground(bg);
+
+    TextView msg = new TextView(this);
+    msg.setText("Maiboli: time is up — still recording.\nExtend " + extMin + " more minutes?");
+    msg.setTextColor(Color.WHITE);
+    msg.setTextSize(15);
+    prompt.addView(msg);
+
+    LinearLayout row = new LinearLayout(this);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+
+    Button stop = new Button(this);
+    stop.setText("Stop & transcribe");
+    stop.setAllCaps(false);
+    stop.setOnClickListener(v -> {
+      dismissPrompt();
+      stopRecording();
+    });
+    row.addView(stop);
+
+    Button extend = new Button(this);
+    extend.setText("Extend " + extMin + " min");
+    extend.setAllCaps(false);
+    extend.setOnClickListener(v -> {
+      dismissPrompt();
+      main.postDelayed(timeUp, extMin * 60_000L);
+      toast("Extended " + extMin + " minutes.");
+    });
+    row.addView(extend);
+
+    prompt.addView(row);
+
+    WindowManager.LayoutParams plp = new WindowManager.LayoutParams(
+        WindowManager.LayoutParams.WRAP_CONTENT,
+        WindowManager.LayoutParams.WRAP_CONTENT,
+        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+        PixelFormat.TRANSLUCENT);
+    plp.gravity = Gravity.CENTER;
+    try {
+      wm.addView(prompt, plp);
+    } catch (Exception e) {
+      prompt = null;
+      stopRecording();
+      return;
+    }
+    // No answer in 30 seconds -> stop and transcribe (safe default).
+    main.postDelayed(promptTimeout, 30_000L);
+  }
+
+  private void promptExpired() {
+    dismissPrompt();
+    if (recording) {
+      toast("Time limit reached — transcribing.");
+      stopRecording();
+    }
+  }
+
+  private void dismissPrompt() {
+    main.removeCallbacks(promptTimeout);
+    if (prompt != null) {
+      try { wm.removeView(prompt); } catch (Exception ignored) {}
+      prompt = null;
+    }
   }
 
   private void stopRecording() {
     if (!recording) return;
     recording = false;
+    main.removeCallbacks(timeUp);
+    dismissPrompt();
     busy = true;
     setState("busy");
     new Thread(() -> {
@@ -233,6 +332,8 @@ public class FloatService extends Service {
 
   @Override public void onDestroy() {
     recording = false;
+    main.removeCallbacks(timeUp);
+    dismissPrompt();
     if (bubble != null) {
       try { wm.removeView(bubble); } catch (Exception ignored) {}
       bubble = null;
