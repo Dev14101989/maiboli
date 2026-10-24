@@ -76,45 +76,27 @@ async function gemini(buffer, cfg) {
       "faithfully into natural English, without adding or dropping " +
       "anything. Output ONLY the English text — no comments, no quotes.";
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const payload = {
-    contents: [
-      {
-        parts: [
-          { inline_data: { mime_type: "audio/wav", data: buffer.toString("base64") } },
-          { text: instruction },
+  const res = await fetchWithRetry(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: { "x-goog-api-key": cfg.geminiApiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { inline_data: { mime_type: "audio/wav", data: buffer.toString("base64") } },
+              { text: instruction },
+            ],
+          },
         ],
-      },
-    ],
-    // Reasoning models (3.8-flash and newer) can spend the whole reply on
-    // internal "thinking" and return empty text; turn thinking off.
-    generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
-  };
-  const opts = (body) => ({
-    method: "POST",
-    headers: { "x-goog-api-key": cfg.geminiApiKey, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  let res = await fetchWithRetry(url, opts(payload));
-  if (res.status === 400) {
-    // Older models reject thinkingConfig — retry once without it.
-    delete payload.generationConfig;
-    res = await fetchWithRetry(url, opts(payload));
-  }
+      }),
+    }
+  );
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
   const json = await res.json();
   const parts = json.candidates?.[0]?.content?.parts || [];
-  const text = parts.map((p) => p.text || "").join("").trim();
-  if (!text) {
-    const reason =
-      json.candidates?.[0]?.finishReason ||
-      json.promptFeedback?.blockReason ||
-      "empty reply";
-    throw new Error(
-      `Gemini sent no text back (${reason}). Try again, or set model gemini-3.5-flash in Settings.`
-    );
-  }
-  return text;
+  return parts.map((p) => p.text || "").join("").trim();
 }
 
 // Polish text with a small LLM pass (for whisper/sarvam providers).
